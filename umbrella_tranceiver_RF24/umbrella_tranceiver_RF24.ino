@@ -5,13 +5,14 @@
 
 #include "nRF24L01.h"
 #include "RF24.h"
+#include "printf.h"
 
 //MAIN PROGRAM GLOBAL PARAMETERS
 
-char ID = 'G'; //IDs should be all unique binary values from 0 to MAX_UMBRELLAS.
+char ID = 'H'; //IDs should be all unique binary values from 0 to MAX_UMBRELLAS.
 
 const int RING_PIN =  12; //ring pin
-const int IDS_PER_SECOND = 1; //how many IDS to send out per second
+const int IDS_PER_SECOND = 100; //how many IDS to send out per second
 
 const float PULSE_LENGTH = 2; //in seconds;
 const float CLOSE_COLOR[] =  {255, 30, 30}; //Color of umbrella when close
@@ -41,7 +42,7 @@ float id_delta = 1.0/IDS_PER_SECOND*1000.0; //how long to wait between sendind I
 
 
 //LEDs for debugging.
-const bool LED_MODE = true;
+const bool LED_MODE = false;
 
 const int redPin = 2; //pin of red/far led
 const int yellowPin = 3;//pin of yellow/medium led
@@ -51,6 +52,7 @@ const int greenPin = 4;//pin of green/close led
 //RF24 Radio stuff
 
 RF24 radio(7, 8); // uno
+//RF24 radio(9, 10); //nano
 const uint8_t channel = 0x4c;
 const uint64_t pipes[1] = { 0xF0F0F0F0E9LL}; //use this one channel for RX and TX
 
@@ -65,9 +67,15 @@ void setup() {
  last_id_send = millis(); //set to now
 
  //RF24 STUFF
+
  radio.begin(); //init the radio
+ radio.setDataRate(RF24_250KBPS);
+ radio.setPALevel(RF24_PA_MIN);
  radio.setRetries(5,5); //try to send 100 times with 0 delay.  This doesn't seem to affect things too much.
  radio.setChannel(channel); //set the channel
+ printf_begin();
+ 
+ 
 }
 
 void setReadMode(){ //start listening and open our reading pipe
@@ -83,6 +91,7 @@ void setWriteMode(){ //stop listening so we can talk.  Open our writing pipe
 
 char captureID(){
   Serial.println("LISTENING");
+  radio.printDetails();
   int totals[MAX_UMBRELLAS]; //Array to count instances of each ID
   for (int i = (int)FIRST_ID;i<MAX_UMBRELLAS;i++){
       doBackgroundStuff(); //Running this as much as possible.  see definition.
@@ -123,8 +132,8 @@ char captureID(){
    //gets sent to setLight()
    //this is hard coded in.  Would be nicer to have as global variables
    //Or even callibration depending on the total amount of signals we receive
-   if (highest<4) return 'F';
-   if (highest<7) return 'M';
+   if (highest<35) return 'F';
+   if (highest<60) return 'M';
    return 'C';
 }
 
@@ -212,3 +221,4 @@ void updateLight(){
 void loop() {
   setLight(captureID()); //run this over and over
 }
+
