@@ -9,7 +9,7 @@
 
 //MAIN PROGRAM GLOBAL PARAMETERS
 
-char ID = 'H'; //IDs should be all unique binary values from 0 to MAX_UMBRELLAS.
+char ID = 'A'; //IDs should be all unique binary values from 0 to MAX_UMBRELLAS.
 
 const int RING_PIN =  12; //ring pin
 const int IDS_PER_SECOND = 100; //how many IDS to send out per second
@@ -24,8 +24,14 @@ const float FAR_INTENSITY = 100;//intensity of far color out of 100
 const int MAX_UMBRELLAS = 100; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
 char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater than this and less than MAX_UMBRELLAS
 
-const int NUMBER_OF_TESTS = 1; //takes the average signal strength over this many tests
-const float TEST_LENGTH = 2; //length of each test in seconds
+const int NUMBER_OF_TESTS = 20; //takes the average signal strength over this many tests
+const float TEST_LENGTH = 0.1f; //length of each test in seconds
+
+int MEDIUM_SIGNAL_AMOUNT = 1 //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
+int CLOSE_SIGNAL_AMOUNT = 2 //greater than this will be considered "close"
+//less than MEDIUM_SIGNAL_AMOUNT will be considered "far"
+
+float OUTLIER_CONSTANT = 0.8f; //a difference greater than this between tests signals an outlier
 
 //global temp variables
 float color[3];
@@ -42,7 +48,7 @@ float id_delta = 1.0/IDS_PER_SECOND*1000.0; //how long to wait between sendind I
 
 
 //LEDs for debugging.
-const bool LED_MODE = false;
+const bool LED_MODE = true;
 
 const int redPin = 2; //pin of red/far led
 const int yellowPin = 3;//pin of yellow/medium led
@@ -69,8 +75,8 @@ void setup() {
  //RF24 STUFF
 
  radio.begin(); //init the radio
- radio.setDataRate(RF24_250KBPS);
- radio.setPALevel(RF24_PA_MIN);
+ //radio.setDataRate(RF24_250KBPS);
+ //radio.setPALevel(RF24_PA_MIN);
  radio.setRetries(5,5); //try to send 100 times with 0 delay.  This doesn't seem to affect things too much.
  radio.setChannel(channel); //set the channel
  printf_begin();
@@ -93,10 +99,16 @@ char captureID(){
   Serial.println("LISTENING");
   radio.printDetails();
   int totals[MAX_UMBRELLAS]; //Array to count instances of each ID
+  int past_test[MAX_UMBRELLAS]; //Past test to compare our current one to
+  int current_test[MAX_UMBRELLAS]; //The current test
+
   for (int i = (int)FIRST_ID;i<MAX_UMBRELLAS;i++){
       doBackgroundStuff(); //Running this as much as possible.  see definition.
       totals[i] = 0; //Fill the array with 0s
+      past_test[i] = 0;
+      current_test[i] = 0;
   }
+  
   for (int i = 0; i<NUMBER_OF_TESTS; i++){ //How many "tests" to run.  Average is taken of all the tests
     String sample = ""; //empty string
     float t = millis(); //keep track of when we started the test
@@ -107,16 +119,26 @@ char captureID(){
       radio.read(&c, sizeof(char)); //Write to the address of our character
       sample.concat(c); //Add on the character to our string
     }
-    for (int i = 0; i<sample.length();i++){ //Now we "sort" our string of IDS
+    for (int j = 0; j<sample.length();j++){ //Now we "sort" our string of IDS
       doBackgroundStuff(); //see definition
-      int value = (int) sample.charAt(i); //get binary value of the ID.  We will use this as the index.  Basically a hash table where casting is our hash function
+      int value = (int) sample.charAt(j); //get binary value of the ID.  We will use this as the index.  Basically a hash table where casting is our hash function
       if (value<=MAX_UMBRELLAS){
-           totals[value]++; //increment the corresponding slot.
+           current_test[value]++; //increment the corresponding slot.
       }
     }
+    for (int j = (int)FIRST_ID; j<MAX_UMBRELLAS;j++){
+      float difference = current_test[j]-past_test[j];
+      if (Math.fabs(difference)>OUTLIER_CONSTANT){
+        //DEAL WITH THE OUTLIER
+        current_test[j] -= difference/2; //fix the outlier by subtracting the outlier
+      }
+      totals[j]+=current_test[j];
+    }
+    
+    
   }
 
-  //we now know approx how far away everything is (RELATIVELY - AMOUNT OF DATA RECEIVED MIGHT CHANGE WHEN WE ADD MORE NODES)
+  //we now know approx how far away everything is (RELATIVELY: AMOUNT OF DATA RECEIVED MIGHT CHANGE WHEN WE ADD MORE NODES)
   //we can do whatever we want with this data, but for now we'll just find the closest umbrella
   
   float highest = 0; //get the highest element in this array we built
@@ -132,8 +154,8 @@ char captureID(){
    //gets sent to setLight()
    //this is hard coded in.  Would be nicer to have as global variables
    //Or even callibration depending on the total amount of signals we receive
-   if (highest<35) return 'F';
-   if (highest<60) return 'M';
+   if (highest<MEDIUM_SIGNAL_AMOUNT) return 'F';
+   if (highest<CLOSE_SIGNAL_AMOUNT) return 'M';
    return 'C';
 }
 
