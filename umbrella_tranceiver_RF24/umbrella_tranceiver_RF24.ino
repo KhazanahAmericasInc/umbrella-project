@@ -9,29 +9,29 @@
 
 //MAIN PROGRAM GLOBAL PARAMETERS
 
-struct packet{
-  char ID;
+struct color{
   int R;
   int G;
   int B;
 };
 
-packet mypacket;
+struct packet{
+  char ID;
+  color RGB;
+};
+
+color thisColor = {0,0,255};  //Unique color
+packet mypacket = {'C', thisColor};
 
 const int RING_PIN =  5; //ring pin
+const int RING_LEDS = 16;
 const int IDS_PER_SECOND = 100; //how many IDS to send out per second
-
 const float PULSE_LENGTH = 2; //in seconds;
-const float CLOSE_COLOR[] =  {255, 30, 30}; //Color of umbrella when close
-const float MEDIUM_COLOR[] = {255, 60, 60}; //Color of umbrella when medium
-const float FAR_COLOR[] = {255, 255, 255}; //Color of umbrella when far
-const float CLOSE_INTENSITY = 20; //intensity of close color out of 100
-const float MEDIUM_INTENSITY = 50; //intensity of medium color out of 100
-const float FAR_INTENSITY = 100;//intensity of far color out of 100
+const float CLOSE_INTENSITY = 20; //intensity of color out of 100
+const float MEDIUM_INTENSITY = 50; //intensity of color out of 100
+const float FAR_INTENSITY = 100;//intensity of color out of 100
 const int MAX_UMBRELLAS = 100; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
 char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater than this and less than MAX_UMBRELLAS
-
-packet rgb_data[MAX_UMBRELLAS]; //store the RGB of each umbrella
 
 const int NUMBER_OF_TESTS = 20; //takes the average signal strength over this many tests
 const float TEST_LENGTH = 0.1f; //length of each test in seconds
@@ -43,11 +43,10 @@ int CLOSE_SIGNAL_AMOUNT = 2; //greater than this will be considered "close"
 float OUTLIER_CONSTANT = 0.2f; //a difference greater than this between tests signals an outlier
 
 //global temp variables
-float color[3];
 bool up = true; //whether or not to increase intensity
 float last_pulse = 0; //keep track of last light update
 
-float max_intensity = 255; //max intensity
+float max_intensity = 100; //max intensity
 float intensity = 0; //current intensity
 //basically mapping black (0,0,0) to each color
 
@@ -57,8 +56,8 @@ float id_delta = 1.0/IDS_PER_SECOND*1000.0; //how long to wait between sendind I
 
 
 //LEDs for debugging.
-const bool LED_MODE = true;
-const bool DEBUG_MODE = true;
+const bool LED_MODE = false;
+const bool DEBUG_MODE = false;
 
 const int redPin = 2; //pin of red/far led
 const int yellowPin = 3;//pin of yellow/medium led
@@ -72,15 +71,13 @@ RF24 radio(7, 8); // uno
 const uint8_t channel = 0x4c;
 const uint64_t pipes[1] = { 0xF0F0F0F0E9LL}; //use this one channel for RX and TX
 
-Adafruit_NeoPixel ring = Adafruit_NeoPixel(16, RING_PIN); //setup our 16 pixel ring
+Adafruit_NeoPixel ring = Adafruit_NeoPixel(RING_LEDS, RING_PIN); //setup our 16 pixel ring
+packet rgb_data[MAX_UMBRELLAS]; //store the RGB of each umbrella
+color ring_colors[RING_LEDS]; //store the RGB of each LED
 
 
 void setup() {
 
-  mypacket.ID = 'H'; //IDs should be all unique binary values from 0 to MAX_UMBRELLAS.
-  mypacket.R = 255;
-  mypacket.G = 255;
-  mypacket.B = 255;
   
  Serial.begin(9600);
  ring.begin(); //init ring
@@ -99,9 +96,9 @@ void setup() {
 
  for (int i = (int)FIRST_ID; i<MAX_UMBRELLAS;i++){
   rgb_data[i].ID = (char) i;
-  rgb_data[i].R = 0;
-  rgb_data[i].G = 0;
-  rgb_data[i].B = 0;
+  rgb_data[i].RGB.R = 0;
+  rgb_data[i].RGB.G = 0;
+  rgb_data[i].RGB.B = 0;
  }
 }
 
@@ -151,6 +148,7 @@ char captureID(){
       }
     }
     for (int j = (int)FIRST_ID; j<MAX_UMBRELLAS;j++){
+      doBackgroundStuff();
       float difference = current_test[j]-past_test[j];
       if (fabs(difference)>OUTLIER_CONSTANT*NUMBER_OF_TESTS){
         //DEAL WITH THE OUTLIER
@@ -188,26 +186,31 @@ char captureID(){
    highest/=NUMBER_OF_TESTS; //average out
    Serial.println(highest); //for debugging
    Serial.print("COLOR IS ");
-   Serial.println(mypacket.R);
+   Serial.print(mypacket.RGB.R);
+   Serial.print(" ");
+   Serial.print(mypacket.RGB.G);
+   Serial.print(" ");
+   Serial.println(mypacket.RGB.B);
 
    //gets sent to setLight()
    //this is hard coded in.  Would be nicer to have as global variables
    //Or even callibration depending on the total amount of signals we receive
+   
    if (highest<MEDIUM_SIGNAL_AMOUNT) return 'F';
    if (highest<CLOSE_SIGNAL_AMOUNT) return 'M';
-   if (highest<3.8) return 'C';
-   combineColor(indexOfHighest);
-   return 'R';
+   addColor(indexOfHighest);
+   return 'C';
 }
 
-void combineColor(int index){
-  int r1 = mypacket.R;
-  int g1 = mypacket.G;
-  int b1 = mypacket.B;
+void addColor(int index){
+  doBackgroundStuff();
+  int r1 = mypacket.RGB.R;
+  int g1 = mypacket.RGB.G;
+  int b1 = mypacket.RGB.B;
 
-  int r2 = rgb_data[index].R;
-  int g2 = rgb_data[index].G;
-  int b2 = rgb_data[index].B;
+  int r2 = rgb_data[index].RGB.R;
+  int g2 = rgb_data[index].RGB.G;
+  int b2 = rgb_data[index].RGB.B;
 
   int rd = r1-r2;
   int gd = g1-g2;
@@ -217,16 +220,13 @@ void combineColor(int index){
   g1-=gd/2;
   b1-=bd/2;
 
-  mypacket.R = r1;
-  mypacket.G = g1;
-  mypacket.B = b1;
-
-  color[0] = r1;
-  color[1] = g1;
-  color[2] = b1;
+  mypacket.RGB.R = r1;
+  mypacket.RGB.G = g1;
+  mypacket.RGB.B = b1;
 }
 
 String RGBFormat(int input){ //makes sure it's 3 chars long
+  doBackgroundStuff();
   if (input/100>0) return String(input);
   if (input/10>0){
     String temp = "0";
@@ -241,10 +241,7 @@ String RGBFormat(int input){ //makes sure it's 3 chars long
 void setLight(char level){ //pretty straightforward.  Just setting the color/intensity for close/medium/far
   switch (level){
     case 'F': 
-      max_intensity = CLOSE_INTENSITY;
-      color[0] = FAR_COLOR[0];
-      color[1] = FAR_COLOR[1];
-      color[2] = FAR_COLOR[2];
+      max_intensity = FAR_INTENSITY;
       if (LED_MODE){ //only if on LED mode
         digitalWrite(redPin, HIGH);
         digitalWrite(yellowPin, LOW);
@@ -253,9 +250,6 @@ void setLight(char level){ //pretty straightforward.  Just setting the color/int
       break;
     case 'M':
       max_intensity = MEDIUM_INTENSITY;
-      color[0] = MEDIUM_COLOR[0];
-      color[1] = MEDIUM_COLOR[1];
-      color[2] = MEDIUM_COLOR[2];
       if (LED_MODE){
         digitalWrite(redPin, LOW);
         digitalWrite(yellowPin, HIGH);
@@ -263,16 +257,12 @@ void setLight(char level){ //pretty straightforward.  Just setting the color/int
       }
       break;
     case 'C':
-      max_intensity = FAR_INTENSITY;
-      color[0] = CLOSE_COLOR[0];
-      color[1] = CLOSE_COLOR[1];
-      color[2] = CLOSE_COLOR[2];
+      max_intensity = CLOSE_INTENSITY;
       if (LED_MODE){
         digitalWrite(redPin, LOW);
         digitalWrite(yellowPin, LOW);
         digitalWrite(greenPin, HIGH);
       }
-      
       break;
      case 'R': //R for really close
        if (LED_MODE){
@@ -280,8 +270,6 @@ void setLight(char level){ //pretty straightforward.  Just setting the color/int
           digitalWrite(yellowPin, HIGH);
           digitalWrite(greenPin, HIGH);
         }
-      
-     
      break;
   }
 }
@@ -305,9 +293,7 @@ void sendID(){
 }
 void updateLight(){
   if ((millis()-last_pulse)>((1/max_intensity)*1000*PULSE_LENGTH/2)){ //same logic as sendID()
-
     //Simple logic to linearly fade in and out.
-    
     if (up&&intensity<max_intensity){
     intensity++;
     }else if (up&&intensity>=max_intensity){
@@ -322,9 +308,11 @@ void updateLight(){
     last_pulse = millis(); //track this too
   }
   for (int i = 0; i<16;i++){
-    ring.setPixelColor(i,intensity/100*color[0], intensity/100*color[1], intensity/100*color[2]);
+    ring.setPixelColor(i,intensity/100*mypacket.RGB.R, intensity/100*mypacket.RGB.G, intensity/100*mypacket.RGB.B);
   }
   ring.show(); //update our changes
+  //Serial.print("INTENSITY IS ");
+  //Serial.println(intensity);
 }
 
 void loop() {
