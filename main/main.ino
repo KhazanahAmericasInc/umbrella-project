@@ -6,6 +6,17 @@
 #include "printf.h"
 #include "config.h"
 
+struct color {
+  int R;
+  int G;
+  int B;
+};
+
+struct packet {
+  char ID;
+  color RGB;
+};
+
 RF24 radio(7, 8); // uno
 
 void setup() {
@@ -159,19 +170,6 @@ color mixColors (color c1, color c2) { //simple color mixing algo
   temp.R -= rd / 2;
   temp.G -= gd / 2;
   temp.B -= bd / 2;
-  return temp;
-}
-
-String RGBFormat(int input) { //makes sure it's 3 chars long
-  doBackgroundStuff();
-  if (input / 100 > 0) return String(input);
-  if (input / 10 > 0) {
-    String temp = "0";
-    temp.concat(String(input));
-    return temp;
-  }
-  String temp = "00";
-  temp.concat(String(input));
   return temp;
 }
 
