@@ -259,7 +259,7 @@ void updateLight() {
   int g = intensity / 100 * mypacket.RGB.G;
   int b = intensity / 100 * mypacket.RGB.B;
   for (int i = 0; i < 16; i++) {
-    ring.setPixelColor(i,pgm_read_byte(&gamma8[r]),pgm_read_byte(&gamma8[g]),pgm_read_byte(&gamma8[b])); //gamma correction
+    ring.setPixelColor(i,r,g,b); //gamma correction
   }
   ring.show(); //update our changes
   //Serial.print("INTENSITY IS ");
