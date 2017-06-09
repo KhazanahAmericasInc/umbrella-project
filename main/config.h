@@ -13,9 +13,9 @@ struct packet {
   color RGB;
 };
 
-const color originalColor = {0, 0, 255}; //Unique color
+const color originalColor = {0, 255, 0}; //Unique color
 color thisColor = originalColor;
-packet mypacket = {'C', thisColor};
+packet mypacket = {'B', thisColor};
  
 
 const int RING_PIN =  5; //ring pin
@@ -31,8 +31,8 @@ char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater
 const int NUMBER_OF_TESTS = 20; //takes the average signal strength over this many tests
 const float TEST_LENGTH = 0.1f; //length of each test in seconds
 
-int MEDIUM_SIGNAL_AMOUNT = 1; //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
-int CLOSE_SIGNAL_AMOUNT = 2; //greater than this will be considered "close"
+int MEDIUM_SIGNAL_AMOUNT = 1.3; //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
+int CLOSE_SIGNAL_AMOUNT = 2.4; //greater than this will be considered "close"
 //less than MEDIUM_SIGNAL_AMOUNT will be considered "far"
 
 float OUTLIER_CONSTANT = 0.2f; //a difference greater than this between tests signals an outlier

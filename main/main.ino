@@ -6,17 +6,6 @@
 #include "printf.h"
 #include "config.h"
 
-struct color {
-  int R;
-  int G;
-  int B;
-};
-
-struct packet {
-  char ID;
-  color RGB;
-};
-
 RF24 radio(7, 8); // uno
 
 void setup() {
@@ -35,6 +24,8 @@ void setup() {
   radio.setRetries(5, 5); //try to send 100 times with 0 delay.  This doesn't seem to affect things too much.
   radio.setChannel(channel); //set the channel
   printf_begin();
+
+  rgb_data[(int)mypacket.ID] = mypacket;
 
   for (int i = (int)FIRST_ID; i < MAX_UMBRELLAS; i++) {
     rgb_data[i].ID = (char) i;
@@ -142,9 +133,21 @@ char captureID() {
   //this is hard coded in.  Would be nicer to have as global variables
   //Or even callibration depending on the total amount of signals we receive
 
-  if (highest < MEDIUM_SIGNAL_AMOUNT) return 'F';
-  if (highest < CLOSE_SIGNAL_AMOUNT) return 'M';
-  addColor(indexOfHighest);
+  timesWithoutNeighbour++;
+  if (highest < MEDIUM_SIGNAL_AMOUNT) {
+    if (timesWithoutNeighbour>=LONELY_CONSTANT){
+      decay();
+    }
+    return 'F';
+  }
+  if (highest < CLOSE_SIGNAL_AMOUNT) {
+    if (timesWithoutNeighbour>=LONELY_CONSTANT){
+      decay();
+    }
+    return 'M';
+  }
+  timesWithoutNeighbour = 0;
+  mixWithNeighbour(indexOfHighest);
   return 'C';
 }
 
@@ -155,6 +158,11 @@ void addColor(int indexOfHighest) {
   ring_colors[filledLEDS + 3] = rgb_data[indexOfHighest].RGB;
   filledLEDS += 4;
   if (filledLEDS >= RING_LEDS) filledLEDS = 0;
+}
+
+void decay(){
+  doBackgroundStuff();
+  mypacket.RGB = mixColors(mypacket.RGB, originalColor);
 }
 
 void mixWithNeighbour(int index) { //mixes the unit's color with the nearest unit's color 50/50
@@ -226,7 +234,7 @@ void sendPacket() {
     color c1 = mixColors(ring_colors[0], ring_colors[4]);
     color c2 = mixColors(ring_colors[8], ring_colors[12]);
     out.RGB = mixColors(c1, c2); //mix 4 colors
-    radio.write(&out, sizeof(packet)); //send out our ID
+    radio.write(&mypacket, sizeof(packet)); //send out our ID
     last_id_send = millis(); //track when we sent it
   }
 }
@@ -247,7 +255,7 @@ void updateLight() {
     last_pulse = millis(); //track this too
   }
   for (int i = 0; i < 16; i++) {
-    ring.setPixelColor(i, intensity / 100 * ring_colors[i].R, intensity / 100 * ring_colors[i].G, intensity / 100 * ring_colors[i].B);
+    ring.setPixelColor(i, intensity / 100 * mypacket.RGB.R, intensity / 100 * mypacket.RGB.G, intensity / 100 * mypacket.RGB.B);
   }
   ring.show(); //update our changes
   //Serial.print("INTENSITY IS ");
