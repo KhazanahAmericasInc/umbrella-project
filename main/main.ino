@@ -254,8 +254,12 @@ void updateLight() {
     }
     last_pulse = millis(); //track this too
   }
+
+  int r = intensity / 100 * mypacket.RGB.R;
+  int g = intensity / 100 * mypacket.RGB.G;
+  int b = intensity / 100 * mypacket.RGB.B;
   for (int i = 0; i < 16; i++) {
-    ring.setPixelColor(i, intensity / 100 * mypacket.RGB.R, intensity / 100 * mypacket.RGB.G, intensity / 100 * mypacket.RGB.B);
+    ring.setPixelColor(i,pgm_read_byte(&gamma8[r]),pgm_read_byte(&gamma8[g]),pgm_read_byte(&gamma8[b])); //gamma correction
   }
   ring.show(); //update our changes
   //Serial.print("INTENSITY IS ");
