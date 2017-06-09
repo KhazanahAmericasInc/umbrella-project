@@ -50,7 +50,7 @@ void setWriteMode() { //stop listening so we can talk.  Open our writing pipe
 }
 
 
-char captureID() {
+char captureID() { //todo separate this
   Serial.println("TRYING");
   if (DEBUG_MODE) radio.printDetails();
   int totals[MAX_UMBRELLAS]; //Array to count instances of each ID
