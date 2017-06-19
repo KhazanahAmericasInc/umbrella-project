@@ -20,6 +20,7 @@ struct packet {
 struct chipData {
   float ax;
   float ay;
+  float az;
 };
 
 const color originalColor = {0, 255, 0}; //Unique color
@@ -65,12 +66,6 @@ const int INTERRUPT_PIN = 2;
 const uint8_t channel = 0x4c;
 const uint64_t pipes[1] = { 0xF0F0F0F0E9LL}; //use this one channel for RX and TX
 
-uint16_t packetSize;
-Quaternion q;
-VectorInt16 acc;
-VectorInt16 accReal;
-VectorFloat gravity;
-uint8_t fifoBuffer[64];
 
 //GLOBAL VARIABLES USED FOR TEMP STORAGE
 
@@ -90,6 +85,8 @@ packet rgb_data[MAX_UMBRELLAS]; //store the RGB of each umbrella
 color ring_colors[RING_LEDS];
 RF24 radio(7, 8); // uno
 Adafruit_WS2801 bulb = Adafruit_WS2801(4, 9, 10);
+
+const int MPU_addr=0x68;
 
 //gamma correction
 

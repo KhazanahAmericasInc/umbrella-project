@@ -1,6 +1,3 @@
-#include <helper_3dmath.h>
-#include <MPU6050_6Axis_MotionApps20.h>
-
 
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_WS2801.h>
@@ -12,29 +9,8 @@
 #include "printf.h"
 #include "config.h"
 
-
 void setup() {
 
-  /*
-  //MPU I2C setup
-  #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-      Wire.begin();
-      Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
-  #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
-      Fastwire::setup(400, true);
-  #endif
-
-  //MPU setup
-  mpu.initialize();
-  pinMode(INTERRUPT_PIN, INPUT);
-  mpu.setXGyroOffset(220); //setup stuff
-  mpu.setYGyroOffset(76);
-  mpu.setZGyroOffset(-85);
-  mpu.setZAccelOffset(1788);
-  mpu.dmpInitialize();
-  mpu.setDMPEnabled(true);
-  packetSize = mpu.dmpGetFIFOPacketSize();*/
-  
   Serial.begin(9600);
   ring.begin(); //init ring
   ring.show(); //show nothing
@@ -42,7 +18,13 @@ void setup() {
   bulb.show();
   last_pulse = millis(); //set to now
   last_id_send = millis(); //set to now
-  //pinMode(MIC_PIN, INPUT);
+
+  //accelerometer stuff
+  Wire.begin();
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
 
   random_factor = random(MIN_RAND, MAX_RAND);
 
@@ -350,13 +332,14 @@ void loop() {
   setLight(captureID()); //run this over and over
 }
 
-/*chipData getChipData(){
-  uint16_t fifoCount = mpu.getFIFOCount();
-  while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
-  mpu.getFIFOBytes(fifoBuffer, packetSize);
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetAccel(&acc, fifoBuffer);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetLinearAccel(&accReal, &acc, &gravity); 
-}*/
+chipData getChipData(){
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
+  current_data.ax =Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)     
+  current_data.ay =Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  current_data.az = Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  
+}
 
