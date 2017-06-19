@@ -1,6 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <helper_3dmath.h>
+#include <MPU6050_6Axis_MotionApps20.h>
+
 //MAIN PROGRAM GLOBAL PARAMETERS
 
 struct color {
@@ -62,13 +65,13 @@ const int INTERRUPT_PIN = 2;
 const uint8_t channel = 0x4c;
 const uint64_t pipes[1] = { 0xF0F0F0F0E9LL}; //use this one channel for RX and TX
 
-/*uint16_t packetSize;
+uint16_t packetSize;
 Quaternion q;
 VectorInt16 acc;
 VectorInt16 accReal;
 VectorFloat gravity;
 uint8_t fifoBuffer[64];
-/*
+
 //GLOBAL VARIABLES USED FOR TEMP STORAGE
 
 bool up = true; //whether or not to increase intensity

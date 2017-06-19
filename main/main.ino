@@ -1,3 +1,7 @@
+#include <helper_3dmath.h>
+#include <MPU6050_6Axis_MotionApps20.h>
+
+
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_WS2801.h>
 #include <SevenSeg.h>
