@@ -1,3 +1,5 @@
+#include <Adafruit_NeoPixel.h>
+#include <Adafruit_WS2801.h>
 #include <SevenSeg.h>
 #include <Adafruit_NeoPixel.h>
 #include <SPI.h>
@@ -6,15 +8,39 @@
 #include "printf.h"
 #include "config.h"
 
-RF24 radio(7, 8); // uno
 
 void setup() {
 
+  /*
+  //MPU I2C setup
+  #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+      Wire.begin();
+      Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+  #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+      Fastwire::setup(400, true);
+  #endif
+
+  //MPU setup
+  mpu.initialize();
+  pinMode(INTERRUPT_PIN, INPUT);
+  mpu.setXGyroOffset(220); //setup stuff
+  mpu.setYGyroOffset(76);
+  mpu.setZGyroOffset(-85);
+  mpu.setZAccelOffset(1788);
+  mpu.dmpInitialize();
+  mpu.setDMPEnabled(true);
+  packetSize = mpu.dmpGetFIFOPacketSize();*/
+  
   Serial.begin(9600);
   ring.begin(); //init ring
   ring.show(); //show nothing
+  bulb.begin();
+  bulb.show();
   last_pulse = millis(); //set to now
   last_id_send = millis(); //set to now
+  //pinMode(MIC_PIN, INPUT);
+
+  random_factor = random(MIN_RAND, MAX_RAND);
 
   //RF24 STUFF
 
@@ -37,6 +63,7 @@ void setup() {
   for (int i = 0; i < RING_LEDS; i++) {
     ring_colors[i] = mypacket.RGB;
   }
+
 }
 
 void setReadMode() { //start listening and open our reading pipe
@@ -121,6 +148,7 @@ char captureID() { //todo separate this
     }
   }
   highest /= NUMBER_OF_TESTS; //average out
+  Serial.println(indexOfHighest);
   Serial.println(highest); //for debugging
   Serial.print("COLOR IS ");
   Serial.print(mypacket.RGB.R);
@@ -128,7 +156,7 @@ char captureID() { //todo separate this
   Serial.print(mypacket.RGB.G);
   Serial.print(" ");
   Serial.println(mypacket.RGB.B);
-
+  
   //gets sent to setLight()
   //this is hard coded in.  Would be nicer to have as global variables
   //Or even callibration depending on the total amount of signals we receive
@@ -138,16 +166,19 @@ char captureID() { //todo separate this
     if (timesWithoutNeighbour>=LONELY_CONSTANT){
       decay();
     }
+    timesWithNeighbour = 0;
     return 'F';
   }
   if (highest < CLOSE_SIGNAL_AMOUNT) {
     if (timesWithoutNeighbour>=LONELY_CONSTANT){
       decay();
     }
+    timesWithNeighbour = 0;
     return 'M';
   }
   timesWithoutNeighbour = 0;
   mixWithNeighbour(indexOfHighest);
+  timesWithNeighbour++;
   return 'C';
 }
 
@@ -206,6 +237,11 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
         digitalWrite(yellowPin, LOW);
         digitalWrite(greenPin, HIGH);
       }
+      if (timesWithNeighbour>=random_factor){
+        timesWithNeighbour = 0;
+        random_factor = random(MIN_RAND, MAX_RAND);
+        randomizeColor();
+      }
       break;
     case 'R': //R for really close
       if (LED_MODE) {
@@ -225,6 +261,25 @@ void doBackgroundStuff() {
   //so basically, we're spamming these functions everywhere but they don't do anything unless it's time for them to.
   sendPacket();
   updateLight();
+  //chip.readAccelData(chip.accelCount);
+  //chip.getAres();
+  //acc_cache[cache_counter].ax = (float)chip.accelCount[0]*chip.aRes;
+  //acc_cache[cache_counter].ay = (float)chip.accelCount[1]*chip.aRes;
+
+  //cache_counter++;
+  //if (cache_counter>=CACHE_SIZE){
+  //  cache_counter = 0;
+  //}
+}
+
+void randomizeColor(){
+  int r = mypacket.RGB.R;
+  int g = mypacket.RGB.G;
+  int b = mypacket.RGB.B;
+  
+  mypacket.RGB.R = random(r/2, r);
+  mypacket.RGB.G = random(g/2, g);
+  mypacket.RGB.B = random(b/2, b);
 }
 
 void sendPacket() {
@@ -258,10 +313,31 @@ void updateLight() {
   int r = intensity / 100 * mypacket.RGB.R;
   int g = intensity / 100 * mypacket.RGB.G;
   int b = intensity / 100 * mypacket.RGB.B;
+
+  color invertedColor = {
+    ((255-mypacket.RGB.R)<50 ? 50:(255 - mypacket.RGB.R)),
+    ((255-mypacket.RGB.G)<50 ? 50:(255 - mypacket.RGB.G)),
+    ((255-mypacket.RGB.B)<50 ? 50:(255 - mypacket.RGB.B)),
+  };
+  //expecting value from 0 to 1;
+
+  //r += (mypacket.RGB.R-invertedColor.R)*accAvg;
+  //g += (mypacket.RGB.G-invertedColor.G)*accAvg;
+  //b += (mypacket.RGB.G-invertedColor.B)*accAvg;
+
+  // limit color
+  if (r>=255) r = 255;
+  if (g>=255) g= 255;
+  if (b>=255) b = 255;
+  
   for (int i = 0; i < 16; i++) {
     ring.setPixelColor(i,r,g,b); //gamma correction
   }
+  for (int i = 0; i<8;i++){
+    bulb.setPixelColor(i,r,g,b);
+  }
   ring.show(); //update our changes
+  bulb.show();
   //Serial.print("INTENSITY IS ");
   //Serial.println(intensity);
 }
@@ -269,4 +345,14 @@ void updateLight() {
 void loop() {
   setLight(captureID()); //run this over and over
 }
+
+/*chipData getChipData(){
+  uint16_t fifoCount = mpu.getFIFOCount();
+  while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
+  mpu.getFIFOBytes(fifoBuffer, packetSize);
+  mpu.dmpGetQuaternion(&q, fifoBuffer);
+  mpu.dmpGetAccel(&acc, fifoBuffer);
+  mpu.dmpGetGravity(&gravity, &q);
+  mpu.dmpGetLinearAccel(&accReal, &acc, &gravity); 
+}*/
 
