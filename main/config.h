@@ -1,8 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include <helper_3dmath.h>
-#include <MPU6050_6Axis_MotionApps20.h>
+//#include <helper_3dmath.h>
+//#include <MPU6050_6Axis_MotionApps20.h>
 
 //MAIN PROGRAM GLOBAL PARAMETERS
 
@@ -36,7 +36,7 @@ const int IDS_PER_SECOND = 100; //how many IDS to send out per second
 const float PULSE_LENGTH = 2; //in seconds;
 const float CLOSE_INTENSITY = 100; //intensity of color out of 100
 const float MEDIUM_INTENSITY = 60; //intensity of color out of 100
-const float FAR_INTENSITY = 40;//intensity of color out of 100
+const float FAR_INTENSITY = 10;//intensity of color out of 100
 const int MAX_UMBRELLAS = 100; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
 char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater than this and less than MAX_UMBRELLAS
 
@@ -51,8 +51,8 @@ int CLOSE_SIGNAL_AMOUNT = 2.4; //greater than this will be considered "close"
 float OUTLIER_CONSTANT = 0.2f; //a difference greater than this between tests signals an outlier
 int LONELY_CONSTANT = 2; //how many scans to do before becoming lonely and turning back to original color
 int random_factor = 0;
-const int MIN_RAND = 2;
-const int MAX_RAND = 6;
+const int MIN_RAND = 8;
+const int MAX_RAND = 12;
 
 //LEDs for debugging.
 const bool LED_MODE = false;

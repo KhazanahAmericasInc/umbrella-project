@@ -19,12 +19,6 @@ void setup() {
   last_pulse = millis(); //set to now
   last_id_send = millis(); //set to now
 
-  //accelerometer stuff
-  Wire.begin();
-  Wire.beginTransmission(MPU_addr);
-  Wire.write(0x6B);
-  Wire.write(0);
-  Wire.endTransmission(true);
 
   random_factor = random(MIN_RAND, MAX_RAND);
 
@@ -332,7 +326,7 @@ void loop() {
   setLight(captureID()); //run this over and over
 }
 
-chipData getChipData(){
+/*chipData getChipData(){
   Wire.beginTransmission(MPU_addr);
   Wire.write(0x3B);
   Wire.endTransmission(false);
@@ -341,5 +335,5 @@ chipData getChipData(){
   current_data.ay =Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
   current_data.az = Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
   
-}
+}*/
 
