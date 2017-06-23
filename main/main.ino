@@ -1,26 +1,33 @@
-
-#include <Adafruit_NeoPixel.h>
-#include <Adafruit_WS2801.h>
-#include <SevenSeg.h>
 #include <Adafruit_NeoPixel.h>
 #include <SPI.h>
-#include "nRF24L01.h"
+#include "nRF24L01.h" 
 #include "RF24.h"
-#include "printf.h"
 #include "config.h"
 
+//Somehow including this ruins everything
+#include "I2C.h" 
+
+RF24 radio(7, 8); // uno
+int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+
+chipData getChipData(){
+  I2c.read(MPU_addr, 0x3B, 4);
+  current_data.ax=I2c.receive()<<8|I2c.receive();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  current_data.ay=I2c.receive()<<8|I2c.receive();  
+  Serial.print("AcX = "); Serial.print(current_data.ax);
+  Serial.print(" AcY = "); Serial.println(current_data.ay);
+}
+
 void setup() {
+
+  I2c.begin();
+  I2c.write(MPU_addr, 0x6B, 0);
 
   Serial.begin(9600);
   ring.begin(); //init ring
   ring.show(); //show nothing
-  bulb.begin();
-  bulb.show();
   last_pulse = millis(); //set to now
   last_id_send = millis(); //set to now
-
-
-  random_factor = random(MIN_RAND, MAX_RAND);
 
   //RF24 STUFF
 
@@ -29,7 +36,7 @@ void setup() {
   //radio.setPALevel(RF24_PA_MIN);
   radio.setRetries(5, 5); //try to send 100 times with 0 delay.  This doesn't seem to affect things too much.
   radio.setChannel(channel); //set the channel
-  printf_begin();
+//  printf_begin();
 
   rgb_data[(int)mypacket.ID] = mypacket;
 
@@ -43,7 +50,6 @@ void setup() {
   for (int i = 0; i < RING_LEDS; i++) {
     ring_colors[i] = mypacket.RGB;
   }
-
 }
 
 void setReadMode() { //start listening and open our reading pipe
@@ -128,7 +134,6 @@ char captureID() { //todo separate this
     }
   }
   highest /= NUMBER_OF_TESTS; //average out
-  Serial.println(indexOfHighest);
   Serial.println(highest); //for debugging
   Serial.print("COLOR IS ");
   Serial.print(mypacket.RGB.R);
@@ -137,6 +142,7 @@ char captureID() { //todo separate this
   Serial.print(" ");
   Serial.println(mypacket.RGB.B);
   
+
   //gets sent to setLight()
   //this is hard coded in.  Would be nicer to have as global variables
   //Or even callibration depending on the total amount of signals we receive
@@ -146,19 +152,16 @@ char captureID() { //todo separate this
     if (timesWithoutNeighbour>=LONELY_CONSTANT){
       decay();
     }
-    timesWithNeighbour = 0;
     return 'F';
   }
   if (highest < CLOSE_SIGNAL_AMOUNT) {
     if (timesWithoutNeighbour>=LONELY_CONSTANT){
       decay();
     }
-    timesWithNeighbour = 0;
     return 'M';
   }
   timesWithoutNeighbour = 0;
   mixWithNeighbour(indexOfHighest);
-  timesWithNeighbour++;
   return 'C';
 }
 
@@ -171,14 +174,15 @@ void addColor(int indexOfHighest) {
   if (filledLEDS >= RING_LEDS) filledLEDS = 0;
 }
 
-void decay(){
-  doBackgroundStuff();
-  mypacket.RGB = mixColors(mypacket.RGB, originalColor);
-}
 
 void mixWithNeighbour(int index) { //mixes the unit's color with the nearest unit's color 50/50
   doBackgroundStuff();
   mypacket.RGB = mixColors(rgb_data[index].RGB, mypacket.RGB);
+}
+
+void decay(){
+  doBackgroundStuff();
+  mypacket.RGB = mixColors(mypacket.RGB, originalColor);
 }
 
 color mixColors (color c1, color c2) { //simple color mixing algo
@@ -241,15 +245,8 @@ void doBackgroundStuff() {
   //so basically, we're spamming these functions everywhere but they don't do anything unless it's time for them to.
   sendPacket();
   updateLight();
-  //chip.readAccelData(chip.accelCount);
-  //chip.getAres();
-  //acc_cache[cache_counter].ax = (float)chip.accelCount[0]*chip.aRes;
-  //acc_cache[cache_counter].ay = (float)chip.accelCount[1]*chip.aRes;
-
-  //cache_counter++;
-  //if (cache_counter>=CACHE_SIZE){
-  //  cache_counter = 0;
-  //}
+  getChipData();
+  
 }
 
 void randomizeColor(){
@@ -294,30 +291,17 @@ void updateLight() {
   int g = intensity / 100 * mypacket.RGB.G;
   int b = intensity / 100 * mypacket.RGB.B;
 
-  color invertedColor = {
-    ((255-mypacket.RGB.R)<50 ? 50:(255 - mypacket.RGB.R)),
-    ((255-mypacket.RGB.G)<50 ? 50:(255 - mypacket.RGB.G)),
-    ((255-mypacket.RGB.B)<50 ? 50:(255 - mypacket.RGB.B)),
+  color opposite = {
+    255-r,
+    255-g,
+    255-b
   };
-  //expecting value from 0 to 1;
-
-  //r += (mypacket.RGB.R-invertedColor.R)*accAvg;
-  //g += (mypacket.RGB.G-invertedColor.G)*accAvg;
-  //b += (mypacket.RGB.G-invertedColor.B)*accAvg;
-
-  // limit color
-  if (r>=255) r = 255;
-  if (g>=255) g= 255;
-  if (b>=255) b = 255;
+  
   
   for (int i = 0; i < 16; i++) {
     ring.setPixelColor(i,r,g,b); //gamma correction
   }
-  for (int i = 0; i<8;i++){
-    bulb.setPixelColor(i,r,g,b);
-  }
   ring.show(); //update our changes
-  bulb.show();
   //Serial.print("INTENSITY IS ");
   //Serial.println(intensity);
 }
@@ -325,15 +309,4 @@ void updateLight() {
 void loop() {
   setLight(captureID()); //run this over and over
 }
-
-/*chipData getChipData(){
-  Wire.beginTransmission(MPU_addr);
-  Wire.write(0x3B);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
-  current_data.ax =Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)     
-  current_data.ay =Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  current_data.az = Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  
-}*/
 
