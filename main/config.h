@@ -13,34 +13,46 @@ struct color {
 struct packet {
   char ID;
   color RGB;
+  
 };
 
 struct chipData {
-  int16_t ax;
-  int16_t ay;
-  int16_t az;
+  long ax;
+  long ay;
+  long az;
 };
 
+const int CACHE_SIZE = 5; //how many frames to store
+int cache_counter = 0;
+chipData cache[CACHE_SIZE];
+float mcache[CACHE_SIZE];
+int mcache_counter = 0;
 
 const int MPU_addr=0x68;
-chipData current_data = {0,0,0};
-const color originalColor = {0, 0, 255}; //Unique color
+chipData current_data = {0,0};
+
+
+//FOR BEACON, lowercase letters will program.
+color originalColor = {0, 255, 255}; //Unique color
 color thisColor = originalColor;
-packet mypacket = {'B', thisColor};
+packet mypacket = {'C', thisColor};
  
 
 const int RING_PIN =  5; //ring pin
 const int RING_LEDS = 16;
 const int IDS_PER_SECOND = 100; //how many IDS to send out per second
-const float PULSE_LENGTH = 2; //in seconds;
+float pulse_far = 3; //in seconds;
+float pulse_medium = 2.5;
+float pulse_close = 2;
 const float CLOSE_INTENSITY = 100; //intensity of color out of 100
 const float MEDIUM_INTENSITY = 60; //intensity of color out of 100
-const float FAR_INTENSITY = 10;//intensity of color out of 100
+const float FAR_INTENSITY = 100;//intensity of color out of 100
 const int MAX_UMBRELLAS = 100; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
 char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater than this and less than MAX_UMBRELLAS
 
-const int NUMBER_OF_TESTS = 20; //takes the average signal strength over this many tests
+const int NUMBER_OF_TESTS = 12; //takes the average signal strength over this many tests
 const float TEST_LENGTH = 0.1f; //length of each test in seconds
+bool isMedium = false;
 
 int MEDIUM_SIGNAL_AMOUNT = 1.5; //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
 int CLOSE_SIGNAL_AMOUNT = 2.5; //greater than this will be considered "close"

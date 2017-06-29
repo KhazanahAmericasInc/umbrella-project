@@ -7,15 +7,19 @@
 //Somehow including this ruins everything
 #include "I2C.h" 
 
-RF24 radio(7, 8); // uno
-int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+RF24 radio(6, 7); // uno
 
-chipData getChipData(){
-  I2c.read(MPU_addr, 0x3B, 4);
-  current_data.ax=I2c.receive()<<8|I2c.receive();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-  current_data.ay=I2c.receive()<<8|I2c.receive();  
-  Serial.print("AcX = "); Serial.print(current_data.ax);
-  Serial.print(" AcY = "); Serial.println(current_data.ay);
+
+void getChipData(){
+  I2c.read(MPU_addr, 0x3B, 6);
+  cache[cache_counter].ax=(int)(I2c.receive()<<8|I2c.receive());  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  cache[cache_counter].ay=(int)(I2c.receive()<<8|I2c.receive());
+  cache[cache_counter].az=(int)(I2c.receive()<<8|I2c.receive());
+  
+  cache_counter++;
+  if (cache_counter>CACHE_SIZE-1){
+    cache_counter = 0;
+  }
 }
 
 void setup() {
@@ -78,21 +82,32 @@ char captureID() { //todo separate this
   }
 
   for (int i = 0; i < NUMBER_OF_TESTS; i++) { //How many "tests" to run.  Average is taken of all the tests
-    String sample = ""; //empty string
+    char ids[2000]; //empty string
+    int index = 0;
     float t = millis(); //keep track of when we started the test
 
     while (millis() - t < 1000.0 * TEST_LENGTH) { //while the time doesn't exceed our defined test length
       doBackgroundStuff(); //see definition
       packet p;
       setReadMode();
-      radio.read(&p, sizeof(packet)); //Write to the address of our character
-      sample.concat(p.ID); //Add on the character to our string
-      String rgb_string = "";
-      rgb_data[(int)p.ID] = p;
+      if (radio.available()){
+        radio.read(&p, sizeof(packet)); //Write to the address of our packet
+        //Serial.println((char)(p.ID-37));
+        if ((char)(p.ID-32)==mypacket.ID){
+          //BEACON FOUND
+          originalColor = p.RGB;
+          mypacket.RGB = originalColor;
+        }
+        ids[index] = p.ID; //Add on the character to our string
+        index++;
+        String rgb_string = "";
+        Serial.print(p.ID);
+        rgb_data[(int)p.ID] = p;
+      }
     }
-    for (int j = 0; j < sample.length(); j++) { //Now we "sort" our string of IDS
+    for (int j = 0; j <= index; j++) { //Now we "sort" our string of IDS
       doBackgroundStuff(); //see definition
-      int value = (int) sample.charAt(j); //get binary value of the ID.  We will use this as the index.  Basically a hash table where casting is our hash function
+      int value = (int) ids[j]; //get binary value of the ID.  We will use this as the index.  Basically a hash table where casting is our hash function
       if (value <= MAX_UMBRELLAS) {
         current_test[value]++; //increment the corresponding slot.
       }
@@ -144,24 +159,26 @@ char captureID() { //todo separate this
   
 
   //gets sent to setLight()
-  //this is hard coded in.  Would be nicer to have as global variables
-  //Or even callibration depending on the total amount of signals we receive
 
-  timesWithoutNeighbour++;
+  
   if (highest < MEDIUM_SIGNAL_AMOUNT) {
     if (timesWithoutNeighbour>=LONELY_CONSTANT){
       decay();
+      timesWithoutNeighbour++;
     }
+    isMedium = false;
     return 'F';
   }
   if (highest < CLOSE_SIGNAL_AMOUNT) {
-    if (timesWithoutNeighbour>=LONELY_CONSTANT){
-      decay();
+    if (!isMedium){
+      mixWithNeighbour(indexOfHighest, 20);
+      isMedium = true;
     }
     return 'M';
   }
   timesWithoutNeighbour = 0;
-  mixWithNeighbour(indexOfHighest);
+  mixWithNeighbour(indexOfHighest, 50);
+  isMedium = false;
   return 'C';
 }
 
@@ -175,9 +192,9 @@ void addColor(int indexOfHighest) {
 }
 
 
-void mixWithNeighbour(int index) { //mixes the unit's color with the nearest unit's color 50/50
+void mixWithNeighbour(int index, float mixaAmount) { //mixes the unit's color with the nearest unit's color mixAmount from 0-100 - percentage of first color
   doBackgroundStuff();
-  mypacket.RGB = mixColors(rgb_data[index].RGB, mypacket.RGB);
+  mypacket.RGB = mixColors(rgb_data[index].RGB, mypacket.RGB, mixAmount/100.0);
 }
 
 void decay(){
@@ -185,15 +202,12 @@ void decay(){
   mypacket.RGB = mixColors(mypacket.RGB, originalColor);
 }
 
-color mixColors (color c1, color c2) { //simple color mixing algo
-  color temp = c1;
-  int rd = c1.R - c2.R;
-  int gd = c1.G - c2.G;
-  int bd = c1.B - c2.B;
-  temp.R -= rd / 2;
-  temp.G -= gd / 2;
-  temp.B -= bd / 2;
-  return temp;
+color mixColors (color c1, color c2, float percentageFirst) { //simple color mixing algo
+  color mixed;
+  mixed.R = (c1.R*percentageFirst)+(c2.R*(1.0-percentageFirst));
+  mixed.G = (c1.G*percentageFirst)+(c2.G*(1.0-percentageFirst));
+  mixed.B = (c1.B*percentageFirst)+(c2.B*(1.0-percentageFirst));
+  return mixed;
 }
 
 void setLight(char level) { //pretty straightforward.  Just setting the color/intensity for close/medium/far
@@ -225,13 +239,6 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
         timesWithNeighbour = 0;
         random_factor = random(MIN_RAND, MAX_RAND);
         randomizeColor();
-      }
-      break;
-    case 'R': //R for really close
-      if (LED_MODE) {
-        digitalWrite(redPin, HIGH);
-        digitalWrite(yellowPin, HIGH);
-        digitalWrite(greenPin, HIGH);
       }
       break;
   }
@@ -291,12 +298,27 @@ void updateLight() {
   int g = intensity / 100 * mypacket.RGB.G;
   int b = intensity / 100 * mypacket.RGB.B;
 
-  color opposite = {
-    255-r,
-    255-g,
-    255-b
-  };
   
+
+  chipData devs = getStandardDeviations();
+
+  mcache[mcache_counter] = ((float)devs.ax/9000.0 + (float)devs.ax/9000.0 + (float)devs.ax/9000.0)/3.0;
+  mcache_counter++;
+  if (mcache_counter>=CACHE_SIZE-1) mcache_counter = 0;
+  
+
+  float multiplier = 0;
+  for (int i = 0; i<CACHE_SIZE; i++){
+    multiplier+=mcache[i];
+  }
+  multiplier/=CACHE_SIZE;
+  color opposite = {
+    255,0,0
+  };
+
+  r = (opposite.R*multiplier)+(r*(1.0-multiplier));
+  g = (opposite.G*multiplier)+(g*(1.0-multiplier));
+  b = (opposite.B*multiplier)+(b*(1.0-multiplier));
   
   for (int i = 0; i < 16; i++) {
     ring.setPixelColor(i,r,g,b); //gamma correction
@@ -308,5 +330,41 @@ void updateLight() {
 
 void loop() {
   setLight(captureID()); //run this over and over
+}
+
+chipData getStandardDeviations (){
+  
+  long meanX = 0;
+  long meanY = 0;
+  long meanZ = 0;
+
+  for (int i = 0; i<CACHE_SIZE; i++){
+    meanX+=(long)cache[i].ax;
+    meanY+=(long)cache[i].ay; 
+    meanZ+=(long)cache[i].az; 
+  }
+  
+
+  meanX/=CACHE_SIZE;
+  
+  meanY/=CACHE_SIZE;
+
+  meanZ/=CACHE_SIZE;
+
+  long sqDevSumX = 0;
+  long sqDevSumY = 0;
+  long sqDevSumZ = 0;
+
+  for (int i = 0; i<CACHE_SIZE;i++){
+    sqDevSumX+= ((cache[i].ax-meanX)*(cache[i].ax-meanX));
+    sqDevSumY+= ((cache[i].ay-meanY)*(cache[i].ay-meanY));
+    sqDevSumZ+= ((cache[i].az-meanZ)*(cache[i].az-meanZ));
+  }
+
+  return  
+  { sqrt(abs(sqDevSumX/CACHE_SIZE)),
+    sqrt(abs(sqDevSumY/CACHE_SIZE)),
+    sqrt(abs(sqDevSumZ/CACHE_SIZE))
+  };
 }
 
