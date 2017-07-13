@@ -3,16 +3,17 @@
 #include "nRF24L01.h" 
 #include "RF24.h"
 #include "config.h"
+
 //Somehow including this ruins everything
 #include "I2C.h" 
 #include "RGBConverter.h"
 
-RF24 radio(6, 7); // uno
-
+RF24 radio(7, 8); // uno
+int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
 
 void getChipData(){
   I2c.read(MPU_addr, 0x43, 6);
-  cache[cache_counter].ax=(int)(I2c.receive()<<8|I2c.receive());  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  cache[cache_counter].ax=(int)(I2c.receive()<<8|I2c.receive());  
   cache[cache_counter].ay=(int)(I2c.receive()<<8|I2c.receive());
   cache[cache_counter].az=(int)(I2c.receive()<<8|I2c.receive());
   
@@ -87,7 +88,6 @@ char captureID() { //todo separate this
     float t = millis(); //keep track of when we started the test
 
     while (millis() - t < 1000.0 * TEST_LENGTH) { //while the time doesn't exceed our defined test length
-      Serial.println("RECORDING");
       doBackgroundStuff(); //see definition
       packet p;
       setReadMode();
@@ -98,9 +98,6 @@ char captureID() { //todo separate this
           //BEACON FOUND
           originalColor = p.RGB;
           mypacket.RGB = originalColor;
-        }else if (p.ID=='?'){
-          //POI FOUND
-          mypacket.RGB = p.RGB;
         }
         ids[index] = p.ID; //Add on the character to our string
         index++;
@@ -218,7 +215,6 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
   switch (level) {
     case 'F':
       max_intensity = FAR_INTENSITY;
-      pulse_length = pulse_far;
       if (LED_MODE) { //only if on LED mode
         digitalWrite(redPin, HIGH);
         digitalWrite(yellowPin, LOW);
@@ -227,7 +223,6 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
       break;
     case 'M':
       max_intensity = MEDIUM_INTENSITY;
-      pulse_length = pulse_medium;
       if (LED_MODE) {
         digitalWrite(redPin, LOW);
         digitalWrite(yellowPin, HIGH);
@@ -236,7 +231,6 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
       break;
     case 'C':
       max_intensity = CLOSE_INTENSITY;
-      pulse_length = pulse_close;
       if (LED_MODE) {
         digitalWrite(redPin, LOW);
         digitalWrite(yellowPin, LOW);
@@ -248,6 +242,13 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
         randomizeColor();
       }
       break;
+    case 'R': //R for really close
+      if (LED_MODE) {
+        digitalWrite(redPin, HIGH);
+        digitalWrite(yellowPin, HIGH);
+        digitalWrite(greenPin, HIGH);
+      }
+      break;
   }
 }
 
@@ -256,10 +257,10 @@ void doBackgroundStuff() {
   //HOWEVER, since we track the time using millis(), and since we have defined the incrememnt of how often we should send IDs and update the light,
   //the functions only actually enter the block IF the defined incrememnt of time has occured.
 
-  //so basically, we're spamming these functions everywhere but they don't do anything unless it's time for them to.
+  //so basically, we're spammng these functions everywhere but they don't do anything unless it's time for them to.
   sendPacket();
   updateLight();
-  //getChipData();
+  getChipData();
   
 }
 
@@ -274,14 +275,15 @@ void randomizeColor(){
 }
 
 void sendPacket() {
-  if ((millis() - last_id_send) > id_delta) { //Logic for timing things right.
+  if ((millis() - last_id_send) > id_delta) { //Logic for timng things right.
     setWriteMode(); //get into write mode
+    packet out = mypacket;
     radio.write(&mypacket, sizeof(packet)); //send out our ID
     last_id_send = millis(); //track when we sent it
   }
 }
 void updateLight() {
-  if ((millis() - last_pulse) > ((1 / max_intensity) * 1000 * pulse_length / 2)) { //same logic as sendID()
+  if ((millis() - last_pulse) > ((1 / max_intensity) * 1000 * PULSE_LENGTH / 2)) { //same logic as sendID()
     //Simple logic to linearly fade in and out.
     if (up && intensity < max_intensity) {
       intensity++;
@@ -296,84 +298,84 @@ void updateLight() {
     }
     last_pulse = millis(); //track this too
   }
-  Serial.println(intensity);
 
-  int r = intensity / 100 * mypacket.RGB.R;
-  int g = intensity / 100 * mypacket.RGB.G;
-  int b = intensity / 100 * mypacket.RGB.B;
 
-  
-
-  /*chipData devs = getStandardDeviations();
-
+  chipData devs = getStandardDeviations();
   mcache[mcache_counter] = ((float)devs.ax/9000.0 + (float)devs.ax/9000.0 + (float)devs.ax/9000.0)/3.0;
   mcache_counter++;
   if (mcache_counter>=CACHE_SIZE-1) mcache_counter = 0;
   
-
   float multiplier = 0;
   for (int i = 0; i<CACHE_SIZE; i++){
     multiplier+=mcache[i];
   }
   multiplier/=CACHE_SIZE;
-  color opposite = {
-    255,0,0
-  };
-
   //r = (opposite.R*multiplier)+(r*(1.0-multiplier));
   //g = (opposite.G*multiplier)+(g*(1.0-multiplier));
   //b = (opposite.B*multiplier)+(b*(1.0-multiplier));
+  Serial.println(multiplier);
   if (multiplier>0.5){
-    Serial.pri
-    //incrementColor();
+    spinCount++;
+    if (spinCount>=SPIN_TO_CHANGE_AMOUNT){
+      incrementColor();
+      spinCount = 0;
+    }
+    
   }
-  */
+
+  int r = intensity / 100 * mypacket.RGB.R;
+  int g = intensity / 100 * mypacket.RGB.G;
+  int b = intensity / 100 * mypacket.RGB.B;
+  Serial.print(r);
+  Serial.print(g);
+  Serial.println(b);
+  
+  
   for (int i = 0; i < RING_LEDS; i++) {
-    ring.setPixelColor(i,r,g,b);
+    ring.setPixelColor(i,r,g,b); //gamma correction
   }
   ring.show(); //update our changes
   //Serial.print("INTENSITY IS ");
   //Serial.println(intensity);
 }
 
-void loop() {
-  setLight(captureID()); //run this over and over
-}
-
 void incrementColor(){
   color c = mypacket.RGB;
-  double hsv[3];
-  RGBConverter().rgbToHsv((byte)c.R, (byte)c.G, (byte)c.B, hsv);
-  double h = hsv[0];
-  if (hueUp&&h<=0.99){
-    h+=0.01;
-  }else if (hueUp&&h>=0.99){
-    h-=0.01;
-    hueUp = false;
-  }else if (!hueUp&&h>=0.01){
-    h-=0.01;
-  }else{
-    h+=0.01;
-    hueUp = true;
+  switch (colorTwist){
+    case 0:
+      mypacket.RGB = mixColors(c, {255,0,0}, 0.50); //green
+      break;
+    case 1:
+      mypacket.RGB = mixColors(c, {125,255,0}, 0.50); //yellow green
+      break;
+    case 2:
+      mypacket.RGB = mixColors(c, {0,255,255}, 0.50); //blue green
+      break;
+    case 3:
+      mypacket.RGB = mixColors(c, {255,0,255}, 0.50); //purple
+      break;
+    case 4:
+      mypacket.RGB = mixColors(c, {100,255,255}, 0.50); //red violet
+      break;
+    case 5:
+      mypacket.RGB = mixColors(c, {255,0,0}, 0.50); //red
+      break;
+    case 6:
+      mypacket.RGB = mixColors(c, {255,150,0}, 0.50); //red orange
+    case 7:
+      mypacket.RGB = mixColors(c, {255,255,0}, 0.50); //yellow
+      break;
   }
-
-  byte rgb[3];
-
-  RGBConverter().hsvToRgb(h, hsv[1], hsv[2], rgb);
-  mypacket.RGB.R = rgb[0];
-  mypacket.RGB.G = rgb[1];
-  mypacket.RGB.B = rgb[3];
-  
+  colorTwist++;
+  if (colorTwist>=7) colorTwist = 0;
 }
 
+
 chipData getStandardDeviations (){
-  
   long meanX = 0;
   long meanY = 0;
   long meanZ = 0;
-
   for (int i = 0; i<CACHE_SIZE; i++){
-    doBackgroundStuff();
     meanX+=(long)cache[i].ax;
     meanY+=(long)cache[i].ay; 
     meanZ+=(long)cache[i].az; 
@@ -386,12 +388,12 @@ chipData getStandardDeviations (){
 
   meanZ/=CACHE_SIZE;
 
+
   long sqDevSumX = 0;
   long sqDevSumY = 0;
   long sqDevSumZ = 0;
 
   for (int i = 0; i<CACHE_SIZE;i++){
-    doBackgroundStuff();
     sqDevSumX+= ((cache[i].ax-meanX)*(cache[i].ax-meanX));
     sqDevSumY+= ((cache[i].ay-meanY)*(cache[i].ay-meanY));
     sqDevSumZ+= ((cache[i].az-meanZ)*(cache[i].az-meanZ));
@@ -402,5 +404,112 @@ chipData getStandardDeviations (){
     sqrt(abs(sqDevSumY/CACHE_SIZE)),
     sqrt(abs(sqDevSumZ/CACHE_SIZE))
   };
+}
+
+HSV RGBtoHSV(color in)
+{
+    HSV         out;
+    double      mn, mx, delta;
+
+    mn = in.R < in.G ? in.G : in.G;
+    mn = mn  < in.B ? mn  : in.B;
+
+    mx = in.R > in.G ? in.R : in.G;
+    mx = mx  > in.B ? mx  : in.B;
+
+    out.V = mx;                                // v
+    delta = mx - mn;
+    if (delta < 0.00001)
+    {
+        out.S = 0;
+        out.H = 0; // undefined, maybe nan?
+        return out;
+    }
+    if( mx > 0.0 ) { // NOTE: if Max is == 0, this divide would cause a crash
+        out.S = (delta / mx);                  // s
+    } else {
+        // if mx is 0, then r = g = b = 0              
+        // s = 0, h is undefined
+        out.S = 0.0;
+        out.H = NAN;                            // its now undefined
+        return out;
+    }
+    if( in.R >= mx )                           // > is bogus, just keeps compilor happy
+        out.H = ( in.G - in.B ) / delta;        // between yellow & magenta
+    else
+    if( in.G >= mx )
+        out.H = 2.0 + ( in.B - in.R ) / delta;  // between cyan & yellow
+    else
+        out.H = 4.0 + ( in.R - in.G ) / delta;  // between magenta & cyan
+
+    out.H *= 60.0;                              // degrees
+
+    if( out.H < 0.0 )
+        out.H += 360.0;
+
+    return out;
+}
+
+color HSVtoRGB(HSV in)
+{
+    double      hh, p, q, t, ff;
+    long        i;
+    color         out;
+
+    if(in.S <= 0.0) {       // < is bogus, just shuts up warnings
+        out.R = in.V;
+        out.G = in.V;
+        out.B = in.V;
+        return out;
+    }
+    hh = in.H;
+    if(hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = in.V * (1.0 - in.S);
+    q = in.V * (1.0 - (in.S * ff));
+    t = in.V * (1.0 - (in.S * (1.0 - ff)));
+
+    switch(i) {
+    case 0:
+        out.R = in.V;
+        out.G = t;
+        out.B = p;
+        break;
+    case 1:
+        out.R = q;
+        out.G = in.V;
+        out.B = p;
+        break;
+    case 2:
+        out.R = p;
+        out.G = in.V;
+        out.B = t;
+        break;
+
+    case 3:
+        out.R = p;
+        out.G = q;
+        out.B = in.V;
+        break;
+    case 4:
+        out.R = t;
+        out.G = p;
+        out.B = in.V;
+        break;
+    default:
+        out.R = in.V;
+        out.G = p;
+        out.B = q;
+        break;
+    }
+    return out;     
+}
+
+
+
+void loop() {
+  setLight(captureID()); //run this over and over
 }
 
