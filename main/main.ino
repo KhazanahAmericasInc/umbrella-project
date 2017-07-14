@@ -165,8 +165,8 @@ char captureID() { //todo separate this
   if (highest < MEDIUM_SIGNAL_AMOUNT) {
     if (timesWithoutNeighbour>=LONELY_CONSTANT){
       decay();
-      timesWithoutNeighbour++;
     }
+    timesWithoutNeighbour++;
     isMedium = false;
     return 'F';
   }
@@ -175,6 +175,7 @@ char captureID() { //todo separate this
       mixWithNeighbour(indexOfHighest, 20);
       isMedium = true;
     }
+    timesWithoutNeighbour++;
     return 'M';
   }
   timesWithoutNeighbour = 0;
@@ -283,6 +284,7 @@ void sendPacket() {
   }
 }
 void updateLight() {
+  Serial.println(intensity);
   if ((millis() - last_pulse) > ((1 / max_intensity) * 1000 * PULSE_LENGTH / 2)) { //same logic as sendID()
     //Simple logic to linearly fade in and out.
     if (up && intensity < max_intensity) {
@@ -309,11 +311,11 @@ void updateLight() {
   for (int i = 0; i<CACHE_SIZE; i++){
     multiplier+=mcache[i];
   }
+  
   multiplier/=CACHE_SIZE;
   //r = (opposite.R*multiplier)+(r*(1.0-multiplier));
   //g = (opposite.G*multiplier)+(g*(1.0-multiplier));
   //b = (opposite.B*multiplier)+(b*(1.0-multiplier));
-  Serial.println(multiplier);
   if (multiplier>0.5){
     spinCount++;
     if (spinCount>=SPIN_TO_CHANGE_AMOUNT){
@@ -326,9 +328,6 @@ void updateLight() {
   int r = intensity / 100 * mypacket.RGB.R;
   int g = intensity / 100 * mypacket.RGB.G;
   int b = intensity / 100 * mypacket.RGB.B;
-  Serial.print(r);
-  Serial.print(g);
-  Serial.println(b);
   
   
   for (int i = 0; i < RING_LEDS; i++) {

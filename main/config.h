@@ -37,7 +37,7 @@ const int SPIN_TO_CHANGE_AMOUNT = 9;
 
 const int MPU_addr=0x68;
 chipData current_data = {0,0,0};
-const color originalColor = {0, 0, 255}; //Unique color
+const color originalColor = {0, 255, 0}; //Unique color
 color thisColor = originalColor;
 packet mypacket = {'B', thisColor};
  

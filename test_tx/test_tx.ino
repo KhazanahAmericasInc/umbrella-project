@@ -14,6 +14,7 @@ void setup(void)
   Serial.begin(57600);
   printf_begin();
   radio.begin();
+  radio.setPALevel(RF24_PA_MAX);
 
   radio.setRetries(15,15);
   radio.setChannel(channel);
