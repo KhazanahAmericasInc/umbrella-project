@@ -367,6 +367,7 @@ void incrementColor(){
   }
   colorTwist++;
   if (colorTwist>=7) colorTwist = 0;
+  originalColor = mypacket.RGB;
 }
 
 
