@@ -37,9 +37,9 @@ const int SPIN_TO_CHANGE_AMOUNT = 9;
 
 const int MPU_addr=0x68;
 chipData current_data = {0,0,0};
-color originalColor = {0, 255, 0}; //Unique color
+color originalColor = {125, 0, 125}; //Unique color
 color thisColor = originalColor;
-packet mypacket = {'B', thisColor};
+packet mypacket = {'E', thisColor};
  
 
 const int RING_PIN =  5; //ring pin
