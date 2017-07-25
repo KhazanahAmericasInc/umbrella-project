@@ -1,6 +1,5 @@
 #ifndef CONFIG_H
 #define CONFIG_H
-//MAIN PROGRAM GLOBAL PARAMETERS
 
 //STRUCTS
 
@@ -19,6 +18,7 @@ struct HSV{
 struct packet {
   char ID;
   color RGB;
+  int intensity;
 };
 
 struct chipData {
@@ -37,31 +37,35 @@ const int SPIN_TO_CHANGE_AMOUNT = 9;
 
 const int MPU_addr=0x68;
 chipData current_data = {0,0,0};
-color originalColor = {125, 0, 125}; //Unique color
+color originalColor = {255, 255, 255}; //Unique color
 color thisColor = originalColor;
-packet mypacket = {'E', thisColor};
+packet mypacket = {'B', thisColor, -1};
  
 
 const int RING_PIN =  5; //ring pin
 
-const int RING_LEDS = 24;
+const int RING_LEDS = 32;
 const int IDS_PER_SECOND = 100; //how many IDS to send out per second
-const float PULSE_LENGTH = 2; //in seconds;
+float pulse_length = 2; //in seconds;
+const float PULSE_LENGTH_FAR = 3.5; //in seconds;
+const float PULSE_LENGTH_MEDIUM = 2.5; //in seconds;
+const float PULSE_LENGTH_CLOSE = 1.5; //in seconds;
 const float CLOSE_INTENSITY = 100; //intensity of color out of 100
-const float MEDIUM_INTENSITY = 100; //intensity of color out of 100
-const float FAR_INTENSITY = 100;//intensity of color out of 100
-const int MAX_UMBRELLAS = 100; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
+const float MEDIUM_INTENSITY = 50; //intensity of color out of 100
+const float FAR_INTENSITY = 15;//intensity of color out of 100
+
+const int MAX_UMBRELLAS = 91; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
 char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater than this and less than MAX_UMBRELLAS
 
 const int NUMBER_OF_TESTS = 14; //takes the average signal strength over this many tests
 const float TEST_LENGTH = 0.1f; //length of each test in seconds
 
-int MEDIUM_SIGNAL_AMOUNT = 1.5; //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
-int CLOSE_SIGNAL_AMOUNT = 2.5; //greater than this will be considered "close"
+float MEDIUM_SIGNAL_AMOUNT = 1.5; //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
+float CLOSE_SIGNAL_AMOUNT = 2.5; //greater than this will be considered "close"
 //less than MEDIUM_SIGNAL_AMOUNT will be considered "far"
 
 float OUTLIER_CONSTANT = 0.2f; //a difference greater than this between tests signals an outlier
-int LONELY_CONSTANT = 2; //how many scans to do before becoming lonely and turning back to original color
+int LONELY_CONSTANT = 4; //how many scans to do before becoming lonely and turning back to original color
 int random_factor = 0;
 const int MIN_RAND = 8;
 const int MAX_RAND = 12;
@@ -86,7 +90,7 @@ float last_pulse = 0; //keep track of last light update
 int filledLEDS = 0; //track how many LEDs have other unit's colors
 int timesWithoutNeighbour = 0; //count how many times we were far away
 int timesWithNeighbour = 0; //count how many times we have a close neighbour - used for random factor when close
-float max_intensity = 100; //max intensity
+float max_intensity = FAR_INTENSITY; //max intensity
 float intensity = 0; //current intensity
 float last_id_send = 0; //last time we sent an ID
 float id_delta = 1.0 / IDS_PER_SECOND * 1000.0; //how long to wait between sendind IDs
@@ -97,7 +101,7 @@ int colorTwist = 0;
 
 
 Adafruit_NeoPixel ring = Adafruit_NeoPixel(RING_LEDS, RING_PIN); //setup our 16 pixel ring
-packet rgb_data[MAX_UMBRELLAS]; //store the RGB of each umbrella
+packet packet_data[MAX_UMBRELLAS]; //store the RGB of each umbrella
 color ring_colors[RING_LEDS];
 
 //gamma correction

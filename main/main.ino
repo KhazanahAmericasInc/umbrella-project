@@ -43,13 +43,14 @@ void setup() {
   radio.setChannel(channel); //set the channel
 //  printf_begin();
 
-  rgb_data[(int)mypacket.ID] = mypacket;
+  packet_data[(int)mypacket.ID] = mypacket;
 
   for (int i = (int)FIRST_ID; i < MAX_UMBRELLAS; i++) {
-    rgb_data[i].ID = (char) i;
-    rgb_data[i].RGB.R = 0;
-    rgb_data[i].RGB.G = 0;
-    rgb_data[i].RGB.B = 0;
+    packet_data[i].ID = (char) i;
+    packet_data[i].RGB.R = 0;
+    packet_data[i].RGB.G = 0;
+    packet_data[i].RGB.B = 0;
+    packet_data[i].intensity = -1; //default intensity AKA no intensity 
   }
 
   for (int i = 0; i < RING_LEDS; i++) {
@@ -72,14 +73,14 @@ char captureID() { //todo separate this
   Serial.println("TRYING");
   if (DEBUG_MODE) radio.printDetails();
   int totals[MAX_UMBRELLAS]; //Array to count instances of each ID
-  int past_test[MAX_UMBRELLAS]; //Past test to compare our current one to
-  int current_test[MAX_UMBRELLAS]; //The current test
+  /*int past_test[MAX_UMBRELLAS]; //Past test to compare our current one to
+  int current_test[MAX_UMBRELLAS]; //The current test*/
 
   for (int i = (int)FIRST_ID; i < MAX_UMBRELLAS; i++) {
     doBackgroundStuff(); //Running this as much as possible.  see definition.
     totals[i] = 0; //Fill the array with 0s
-    past_test[i] = 0;
-    current_test[i] = 0;
+    /*past_test[i] = 0;
+    current_test[i] = 0;*/
   }
 
   for (int i = 0; i < NUMBER_OF_TESTS; i++) { //How many "tests" to run.  Average is taken of all the tests
@@ -99,21 +100,23 @@ char captureID() { //todo separate this
           originalColor = p.RGB;
           mypacket.RGB = originalColor;
         }
-        ids[index] = p.ID; //Add on the character to our string
-        index++;
-        String rgb_string = "";
+        //ids[index] = p.ID; //Add on the character to our string
+        //index++;
         Serial.print(p.ID);
-        rgb_data[(int)p.ID] = p;
+        totals[(int)p.ID]++;
+        packet_data[(int)p.ID] = p;
       }
     }
-    for (int j = 0; j <= index; j++) { //Now we "sort" our string of IDS
+    /*for (int j = 0; j < index; j++) { //Now we "sort" our array of IDS
       doBackgroundStuff(); //see definition
       int value = (int) ids[j]; //get binary value of the ID.  We will use this as the index.  Basically a hash table where casting is our hash function
       if (value <= MAX_UMBRELLAS) {
-        current_test[value]++; //increment the corresponding slot.
+        Serial.println(value);
+        //totals[value]++;
+        //current_test[value]++; //increment the corresponding slot.
       }
-    }
-    for (int j = (int)FIRST_ID; j < MAX_UMBRELLAS; j++) {
+    }*/
+    /*for (int j = (int)FIRST_ID; j < MAX_UMBRELLAS; j++) {
       doBackgroundStuff();
       float difference = current_test[j] - past_test[j];
       if (fabs(difference) > OUTLIER_CONSTANT * NUMBER_OF_TESTS) {
@@ -133,7 +136,7 @@ char captureID() { //todo separate this
       totals[j] += current_test[j];
       past_test[j] = current_test[j];
       current_test[j] = 0;
-    }
+    }*/
 
   }
 
@@ -157,6 +160,8 @@ char captureID() { //todo separate this
   Serial.print(mypacket.RGB.G);
   Serial.print(" ");
   Serial.println(mypacket.RGB.B);
+  
+  syncIntensity();
   
 
   //gets sent to setLight()
@@ -185,10 +190,10 @@ char captureID() { //todo separate this
 }
 
 void addColor(int indexOfHighest) {
-  ring_colors[filledLEDS] = rgb_data[indexOfHighest].RGB;
-  ring_colors[filledLEDS + 1] = rgb_data[indexOfHighest].RGB;
-  ring_colors[filledLEDS + 2] = rgb_data[indexOfHighest].RGB;
-  ring_colors[filledLEDS + 3] = rgb_data[indexOfHighest].RGB;
+  ring_colors[filledLEDS] = packet_data[indexOfHighest].RGB;
+  ring_colors[filledLEDS + 1] = packet_data[indexOfHighest].RGB;
+  ring_colors[filledLEDS + 2] = packet_data[indexOfHighest].RGB;
+  ring_colors[filledLEDS + 3] = packet_data[indexOfHighest].RGB;
   filledLEDS += 4;
   if (filledLEDS >= RING_LEDS) filledLEDS = 0;
 }
@@ -196,12 +201,13 @@ void addColor(int indexOfHighest) {
 
 void mixWithNeighbour(int index, float mixAmount) { //mixes the unit's color with the nearest unit's color mixAmount from 0-100 - percentage of first color
   doBackgroundStuff();
-  mypacket.RGB = mixColors(rgb_data[index].RGB, mypacket.RGB, mixAmount/100.0);
+  mypacket.RGB = mixColors(packet_data[index].RGB, mypacket.RGB, mixAmount/100.0);
 }
 
 void decay(){
+  Serial.println("DECAYING");
   doBackgroundStuff();
-  mypacket.RGB = mixColors(mypacket.RGB, originalColor, 50);
+  mypacket.RGB = mixColors(mypacket.RGB, originalColor, 0.80);
 }
 
 color mixColors (color c1, color c2, float percentageFirst) { //simple color mixing algo
@@ -213,9 +219,11 @@ color mixColors (color c1, color c2, float percentageFirst) { //simple color mix
 }
 
 void setLight(char level) { //pretty straightforward.  Just setting the color/intensity for close/medium/far
+  
   switch (level) {
     case 'F':
       max_intensity = FAR_INTENSITY;
+      pulse_length = PULSE_LENGTH_FAR;
       if (LED_MODE) { //only if on LED mode
         digitalWrite(redPin, HIGH);
         digitalWrite(yellowPin, LOW);
@@ -224,6 +232,7 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
       break;
     case 'M':
       max_intensity = MEDIUM_INTENSITY;
+      pulse_length = PULSE_LENGTH_MEDIUM;
       if (LED_MODE) {
         digitalWrite(redPin, LOW);
         digitalWrite(yellowPin, HIGH);
@@ -232,6 +241,7 @@ void setLight(char level) { //pretty straightforward.  Just setting the color/in
       break;
     case 'C':
       max_intensity = CLOSE_INTENSITY;
+      pulse_length = PULSE_LENGTH_CLOSE;
       if (LED_MODE) {
         digitalWrite(redPin, LOW);
         digitalWrite(yellowPin, LOW);
@@ -283,20 +293,47 @@ void sendPacket() {
     last_id_send = millis(); //track when we sent it
   }
 }
+
+void syncIntensity(){
+  for (int i = (int)FIRST_ID; i < MAX_UMBRELLAS; i++) {  
+    if (packet_data[i].intensity != -1){
+      if ((char)i==mypacket.ID) {
+        return;
+      }
+      if (packet_data[i].intensity<0){
+        up = false;
+        intensity = packet_data[i].intensity * -1;
+      }else{
+        intensity = packet_data[i].intensity;
+        up = true;
+      }
+      Serial.print("SYNCING INTENSITY TO ");
+      Serial.println((char)i);
+      return;
+    }
+  }
+}
+
 void updateLight() {
-  Serial.println(intensity);
-  if ((millis() - last_pulse) > ((1 / max_intensity) * 1000 * PULSE_LENGTH / 2)) { //same logic as sendID()
+  if ((millis() - last_pulse) > ((1 / max_intensity) * 1000 * pulse_length / 2)) { //same logic as sendID()
     //Simple logic to linearly fade in and out.
     if (up && intensity < max_intensity) {
       intensity++;
     } else if (up && intensity >= max_intensity) {
       intensity--;
       up = false;
-    } else if (!up && intensity > 0) {
+    } else if (!up && intensity > 1) {
       intensity--;
     } else {
       intensity++;
       up = true;
+    }
+    if (up){
+       mypacket.intensity = intensity;
+       packet_data[(int)mypacket.ID].intensity = intensity;
+    }else{
+       mypacket.intensity = intensity*-1;
+       packet_data[(int)mypacket.ID].intensity = intensity*-1;
     }
     last_pulse = millis(); //track this too
   }
