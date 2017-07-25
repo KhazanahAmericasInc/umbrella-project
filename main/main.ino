@@ -107,36 +107,7 @@ char captureID() { //todo separate this
         packet_data[(int)p.ID] = p;
       }
     }
-    /*for (int j = 0; j < index; j++) { //Now we "sort" our array of IDS
-      doBackgroundStuff(); //see definition
-      int value = (int) ids[j]; //get binary value of the ID.  We will use this as the index.  Basically a hash table where casting is our hash function
-      if (value <= MAX_UMBRELLAS) {
-        Serial.println(value);
-        //totals[value]++;
-        //current_test[value]++; //increment the corresponding slot.
-      }
-    }*/
-    /*for (int j = (int)FIRST_ID; j < MAX_UMBRELLAS; j++) {
-      doBackgroundStuff();
-      float difference = current_test[j] - past_test[j];
-      if (fabs(difference) > OUTLIER_CONSTANT * NUMBER_OF_TESTS) {
-        //DEAL WITH THE OUTLIER
-        if (DEBUG_MODE) {
-          Serial.print("CHANGING FROM ");
-          Serial.print(current_test[j]);
-        }
-        current_test[j] -= difference / 2; //fix the outlier by subtracting the outlier
-        if (DEBUG_MODE) {
-          Serial.print(" TO ");
-          Serial.print(current_test[j]);
-          Serial.print(" WHICH IS CLOSER TO ");
-          Serial.println(past_test[j]);
-        }
-      }
-      totals[j] += current_test[j];
-      past_test[j] = current_test[j];
-      current_test[j] = 0;
-    }*/
+   
 
   }
 
@@ -272,6 +243,7 @@ void doBackgroundStuff() {
   sendPacket();
   updateLight();
   getChipData();
+  checkIntensity(); //this waits for the next signal then changes intensity
   
 }
 
@@ -295,22 +267,32 @@ void sendPacket() {
 }
 
 void syncIntensity(){
-  for (int i = (int)FIRST_ID; i < MAX_UMBRELLAS; i++) {  
+  for (int i = (int)FIRST_ID; i < MAX_UMBRELLAS; i++) {
+    doBackgroundStuff();  
     if (packet_data[i].intensity != -1){
       if ((char)i==mypacket.ID) {
         return;
       }
-      if (packet_data[i].intensity<0){
-        up = false;
-        intensity = packet_data[i].intensity * -1;
-      }else{
-        intensity = packet_data[i].intensity;
-        up = true;
-      }
+      intensity_id = i;
+      intensity_flag = true;
       Serial.print("SYNCING INTENSITY TO ");
       Serial.println((char)i);
       return;
     }
+  }
+}
+
+void checkIntensity(){
+  if (!intensity_flag) return;
+  Serial.println("CHANGING INTENSITY TO ");
+  Serial.println(intensity_id);
+  intensity_flag = false;
+  if (packet_data[intensity_id].intensity<0){
+    up = false;
+    intensity = packet_data[intensity_id].intensity * -1;
+  }else{
+    intensity = packet_data[intensity_id].intensity;
+    up = true;
   }
 }
 

@@ -39,7 +39,7 @@ const int MPU_addr=0x68;
 chipData current_data = {0,0,0};
 color originalColor = {255, 255, 255}; //Unique color
 color thisColor = originalColor;
-packet mypacket = {'B', thisColor, -1};
+packet mypacket = {'A', thisColor, -1};
  
 
 const int RING_PIN =  5; //ring pin
@@ -57,8 +57,8 @@ const float FAR_INTENSITY = 15;//intensity of color out of 100
 const int MAX_UMBRELLAS = 91; //max amount of umbrellas NOTE: this code uses binary value of ASCII characters.
 char FIRST_ID = 'A'; //the first ID all other IDS must have binary value greater than this and less than MAX_UMBRELLAS
 
-const int NUMBER_OF_TESTS = 14; //takes the average signal strength over this many tests
-const float TEST_LENGTH = 0.1f; //length of each test in seconds
+const int NUMBER_OF_TESTS = 50; //takes the average signal strength over this many tests
+const float TEST_LENGTH = 0.05f; //length of each test in seconds
 
 float MEDIUM_SIGNAL_AMOUNT = 1.5; //greater than this and less than CLOSE_SIGNAL_AMOUNT will be considered "medium"
 float CLOSE_SIGNAL_AMOUNT = 2.5; //greater than this will be considered "close"
@@ -80,6 +80,9 @@ const int greenPin = 4;//pin of green/close led
 
 const uint8_t channel = 0x4c;
 const uint64_t pipes[1] = { 0xF0F0F0F0E9LL}; //use this one channel for RX and TX
+
+bool intensity_flag = false;
+int intensity_id = -1;
 
 
 
